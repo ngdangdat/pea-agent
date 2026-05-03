@@ -20,19 +20,58 @@ const (
 	maxTokens = 1024
 )
 
-func buildRequest(ctx context.Context, model llm.Model, llmContext llm.Context) (*http.Request, error) {
-	messages := []map[string]string{}
-	for _, msg := range llmContext.Messages {
-		messages = append(messages, map[string]string{
-			"role":    msg.Role,
-			"content": msg.Content,
+func toAnthropicTools(tools []llm.Tool) []anthropicTool {
+	out := make([]anthropicTool, 0, len(tools))
+	for _, t := range tools {
+		out = append(out, anthropicTool{
+			Name:        t.Name,
+			Description: t.Description,
+			InputSchema: t.InputSchema,
 		})
 	}
+	return out
+}
+
+func toAnthropicMessages(messages []llm.Message) []anthropicMessage {
+	out := make([]anthropicMessage, 0, len(messages))
+	for _, msg := range messages {
+		outputMessage := anthropicMessage{Role: msg.Role}
+		content := anthropicMessageContent{}
+		if msg.Blocks != nil {
+			blocks := make([]anthropicContentBlock, 0, len(msg.Blocks))
+			for _, block := range msg.Blocks {
+				b := anthropicContentBlock{Type: block.Type}
+				switch block.Type {
+				case "text":
+					b.Text = block.Text
+				case "tool_use":
+					b.ID = block.ToolCall.ID
+					b.Name = block.ToolCall.Name
+					b.Input = block.ToolCall.Input
+				case "tool_result":
+					b.ToolUseID = block.ToolUseID
+					b.Content = block.Content
+					b.IsError = block.IsError
+				}
+				blocks = append(blocks, b)
+			}
+			content.Blocks = blocks
+		} else {
+			content.Text = msg.Content
+		}
+		outputMessage.Content = content
+		out = append(out, outputMessage)
+	}
+	return out
+}
+
+func buildRequest(ctx context.Context, model llm.Model, llmContext llm.Context) (*http.Request, error) {
 	body, err := json.Marshal(map[string]any{
 		"model":      model.ID,
 		"max_tokens": maxTokens,
 		"stream":     true,
-		"messages":   messages,
+		"messages":   toAnthropicMessages(llmContext.Messages),
+		"tools":      toAnthropicTools(llmContext.Tools),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("marshal request: %w", err)
@@ -83,7 +122,7 @@ func classifyAbort(ctx context.Context) string {
 	return "error"
 }
 
-func parseSSE(body io.Reader, out chan<- llm.Event, model llm.Model) error {
+func parseSSE(body io.Reader, out chan<- llm.Event) error {
 	state := streamState{}
 	scanner := bufio.NewScanner(body)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
@@ -123,7 +162,7 @@ func Stream(ctx context.Context, model llm.Model, llmContext llm.Context) chan l
 			emitError(out, readAPIError(resp), "error")
 			return
 		}
-		if err := parseSSE(resp.Body, out, model); err != nil {
+		if err := parseSSE(resp.Body, out); err != nil {
 			emitError(out, err, "error")
 		}
 

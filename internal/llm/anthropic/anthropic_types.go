@@ -3,13 +3,18 @@ package anthropic
 import (
 	"encoding/json"
 	"strings"
+
+	"github.com/ngdangdat/pea-agent/internal/llm"
 )
 
 type streamState struct {
-	text         strings.Builder // accumulate text_data chunks
-	inputTokens  int             // message start
-	outputTokens int             // message delta
-	stopReason   string          // message delta
+	text             strings.Builder // accumulate text_data chunks
+	toolInputBuf     strings.Builder // accumulate tool_use chunks
+	inputTokens      int             // message start
+	outputTokens     int             // message delta
+	stopReason       string          // message delta
+	currentTool      *llm.ToolCall
+	assistantContent []llm.ContentBlock
 }
 type sseEnvelope struct {
 	Type    anthropicMessageEvent `json:"type"`
@@ -24,12 +29,43 @@ type anthropicUsage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-type textDelta struct {
+type anthropicMessageEvent string
+type anthropicTool struct {
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	InputSchema json.RawMessage `json:"input_schema"`
+}
+type anthropicContentBlock struct {
 	Type string `json:"type"`
-	Text string `json:"text"`
+	// type=text
+	Text string `json:"text,omitempty"`
+	// type=tool_use
+	ID    string          `json:"id,omitempty"`
+	Name  string          `json:"name,omitempty"`
+	Input json.RawMessage `json:"input,omitempty"`
+
+	// type=tool_result
+	ToolUseID string `json:"tool_use_id,omitempty"`
+	Content   string `json:"content,omitempty"`
+	IsError   bool   `json:"is_error,omitempty"`
 }
 
-type anthropicMessageEvent string
+type anthropicMessageContent struct {
+	Text   string                  `json:"text,omitempty"`
+	Blocks []anthropicContentBlock `json:"blocks,omitempty"`
+}
+
+func (c anthropicMessageContent) MarshalJSON() ([]byte, error) {
+	if c.Blocks != nil {
+		return json.Marshal(c.Blocks)
+	}
+	return json.Marshal(c.Text)
+}
+
+type anthropicMessage struct {
+	Role    string                  `json:"role"`
+	Content anthropicMessageContent `json:"content"`
+}
 
 const (
 	messageStart      anthropicMessageEvent = "message_start"

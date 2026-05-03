@@ -6,8 +6,9 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/ngdangdat/pea-agent/internal/agent"
 	"github.com/ngdangdat/pea-agent/internal/llm"
-	"github.com/ngdangdat/pea-agent/internal/llm/anthropic"
+	"github.com/ngdangdat/pea-agent/internal/tools"
 )
 
 func main() {
@@ -19,19 +20,17 @@ func main() {
 	prompt := os.Args[1]
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	stream := anthropic.Stream(ctx, llm.Model{
+	modelCfg := llm.Model{
 		ID:     "claude-haiku-4-5-20251001",
 		APIKey: os.Getenv("ANTHROPIC_API_KEY"),
-	}, llm.Context{Messages: []llm.Message{{Role: "user", Content: prompt}}})
-	for ev := range stream {
-		switch ev.Kind {
-		case llm.EventTextDelta:
-			fmt.Print(ev.Delta)
-		case llm.EventDone:
-			fmt.Println()
-		case llm.EventError:
-			fmt.Fprintln(os.Stderr, "\nerror:", ev.Err)
-			os.Exit(1)
-		}
+	}
+	agentCfg := agent.Config{
+		Model: modelCfg,
+		Tools: []agent.Tool{tools.Read(), tools.Bash()},
+	}
+	err := agent.Run(ctx, agentCfg, prompt)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
 	}
 }
