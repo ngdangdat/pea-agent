@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/ngdangdat/pea-agent/internal/llm"
-	"github.com/ngdangdat/pea-agent/internal/llm/anthropic"
 )
 
 type Config struct {
@@ -24,7 +23,7 @@ func Run(ctx context.Context, cfg Config, prompt string) error {
 
 	for {
 		c := llm.Context{Messages: history, Tools: toolsForLLM(cfg.Tools)}
-		stream := anthropic.Stream(ctx, cfg.Model, c)
+		stream := llm.Stream(ctx, cfg.Model, c)
 
 		var final *llm.AssistantMessage
 		for ev := range stream {

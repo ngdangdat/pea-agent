@@ -20,6 +20,41 @@ const (
 	maxTokens = 1024
 )
 
+type Provider struct{}
+
+func (Provider) Stream(ctx context.Context, model llm.Model, c llm.Context) <-chan llm.Event {
+	out := make(chan llm.Event, 16)
+	go func() {
+		defer close(out)
+		req, err := buildRequest(ctx, model, c)
+		if err != nil {
+			return
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			// return fmt.Errorf("send request: %w", err)
+			emitError(out, err, classifyAbort(ctx))
+			return
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			// return fmt.Errorf("anthropic %d: %s", resp.StatusCode, msg)
+			emitError(out, readAPIError(resp), "error")
+			return
+		}
+		if err := parseSSE(resp.Body, out); err != nil {
+			emitError(out, err, "error")
+		}
+
+	}()
+	return out
+
+}
+
+func init() {
+	llm.Register("anthropic", Provider{})
+}
+
 func toAnthropicTools(tools []llm.Tool) []anthropicTool {
 	out := make([]anthropicTool, 0, len(tools))
 	for _, t := range tools {
@@ -140,32 +175,4 @@ func parseSSE(body io.Reader, out chan<- llm.Event) error {
 		}
 	}
 	return scanner.Err()
-}
-
-func Stream(ctx context.Context, model llm.Model, llmContext llm.Context) chan llm.Event {
-	out := make(chan llm.Event, 16)
-	go func() {
-		defer close(out)
-		req, err := buildRequest(ctx, model, llmContext)
-		if err != nil {
-			return
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			// return fmt.Errorf("send request: %w", err)
-			emitError(out, err, classifyAbort(ctx))
-			return
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			// return fmt.Errorf("anthropic %d: %s", resp.StatusCode, msg)
-			emitError(out, readAPIError(resp), "error")
-			return
-		}
-		if err := parseSSE(resp.Body, out); err != nil {
-			emitError(out, err, "error")
-		}
-
-	}()
-	return out
 }

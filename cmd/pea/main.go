@@ -8,6 +8,7 @@ import (
 
 	"github.com/ngdangdat/pea-agent/internal/agent"
 	"github.com/ngdangdat/pea-agent/internal/llm"
+	_ "github.com/ngdangdat/pea-agent/internal/llm/anthropic"
 	"github.com/ngdangdat/pea-agent/internal/tools"
 )
 
@@ -21,8 +22,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	modelCfg := llm.Model{
-		ID:     "claude-haiku-4-5-20251001",
-		APIKey: os.Getenv("ANTHROPIC_API_KEY"),
+		Provider: "anthropic",
+		ID:       "claude-haiku-4-5-20251001",
+		APIKey:   os.Getenv("ANTHROPIC_API_KEY"),
 	}
 	agentCfg := agent.Config{
 		Model: modelCfg,
