@@ -29,14 +29,14 @@ func Run(ctx context.Context, cfg Config, prompt string) error {
 		for ev := range stream {
 			switch ev.Kind {
 			case llm.EventTextDelta:
-				fmt.Println(ev.Delta)
+				fmt.Print(ev.Delta)
 			case llm.EventDone:
 				final = ev.Final
+				fmt.Println()
 			case llm.EventError:
 				return ev.Err
 			}
 		}
-		fmt.Println()
 		history = append(history, llm.Message{Role: "assistant", Blocks: final.Content})
 
 		if final.StopReason != "tool_use" {

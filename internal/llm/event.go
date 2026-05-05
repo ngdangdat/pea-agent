@@ -71,6 +71,5 @@ type Context struct {
 type Model struct {
 	ID       string
 	APIKey   string
-	BaseURL  string
 	Provider string
 }

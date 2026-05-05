@@ -122,7 +122,7 @@ func buildRequest(ctx context.Context, model llm.Model, llmContext llm.Context) 
 	if apiKey == "" {
 		return nil, fmt.Errorf("Anthropic API key is not passed")
 	}
-	req.Header.Set("x-api-key", model.APIKey)
+	req.Header.Set("x-api-key", apiKey)
 	req.Header.Set("anthropic-version", apiVer)
 	req.Header.Set("content-type", "application/json")
 	return req, nil
