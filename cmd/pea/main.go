@@ -31,7 +31,7 @@ func main() {
 	}
 	agentCfg := agent.Config{
 		Model: modelCfg,
-		Tools: []agent.Tool{tools.Read(), tools.Bash()},
+		Tools: []agent.Tool{tools.Read(), tools.Bash(), tools.Write()},
 	}
 	err := agent.Run(ctx, agentCfg, prompt)
 	if err != nil {
