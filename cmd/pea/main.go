@@ -11,12 +11,13 @@ import (
 	_ "github.com/ngdangdat/pea-agent/internal/llm/anthropic"
 	_ "github.com/ngdangdat/pea-agent/internal/llm/openai"
 	"github.com/ngdangdat/pea-agent/internal/tools"
+	"github.com/ngdangdat/pea-agent/internal/tui"
 )
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Fprintln(os.Stderr, "usage: pea <prompt>")
-		os.Exit(1)
+		tui.New()
+		return
 	}
 
 	prompt := os.Args[1]
